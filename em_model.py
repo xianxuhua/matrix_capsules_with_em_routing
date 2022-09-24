@@ -20,9 +20,9 @@ from __future__ import division
 from __future__ import print_function
 import math
 import tensorflow.compat.v1 as tf
-from capsule_em import em_layers
-from capsule_em import simple_model
-from capsule_em import utils
+import em_layers
+import simple_model
+import utils
 FLAGS = tf.app.flags.FLAGS
 
 

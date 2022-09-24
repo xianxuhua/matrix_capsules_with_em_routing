@@ -20,7 +20,7 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v1 as tf
-from capsule_em import utils
+import utils
 FLAGS = tf.app.flags.FLAGS
 
 

@@ -22,10 +22,10 @@ import time
 import numpy as np
 
 import tensorflow.compat.v1 as tf
-from capsule_em import model as f_model
-from capsule_em.mnist \
+import model as f_model
+from mnist \
   import mnist_record
-from capsule_em.norb \
+from norb \
   import norb_record
 
 
@@ -59,7 +59,7 @@ tf.app.flags.DEFINE_integer('max_steps', 2000000,
 tf.app.flags.DEFINE_string('data_dir', '/datasets/mnist/',
                            'Directory for storing input data')
 tf.app.flags.DEFINE_string('summary_dir',
-                           '/tmp/tensorflow/mnist/logs/mnist_with_summaries',
+                           'summary',
                            'Summaries log directory')
 tf.app.flags.DEFINE_bool('train', True, 'train or test.')
 tf.app.flags.DEFINE_integer(
@@ -138,7 +138,7 @@ tf.app.flags.DEFINE_bool('patching', True, 'If set use patching for eval.')
 tf.app.flags.DEFINE_string('data_set', 'norb', 'the data set to use.')
 tf.app.flags.DEFINE_string('cifar_data_dir', '/tmp/cifar10_data',
                            """Path to the CIFAR-10 data directory.""")
-tf.app.flags.DEFINE_string('norb_data_dir', '/root/datasets/smallNORB/',
+tf.app.flags.DEFINE_string('norb_data_dir', 'data/capsule/smallNORB/',
                            """Path to the norb data directory.""")
 tf.app.flags.DEFINE_string('affnist_data_dir', '/tmp/affnist_data',
                            """Path to the affnist data directory.""")
@@ -162,7 +162,7 @@ def get_features(train, total_batch):
   split = 'train' if train else 'test'
   features = []
   for i in range(FLAGS.num_gpus):
-    with tf.device('/cpu:0'):
+    # with tf.device('/cpu:0'):
       with tf.name_scope('input_tower_%d' % (i)):
         if FLAGS.data_set == 'norb':
           features += [
@@ -230,7 +230,9 @@ def run_training():
     train_step = result['train']
     # test_writer = tf.summary.FileWriter(FLAGS.summary_dir + '/test')
 
-    sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+    config = tf.ConfigProto(allow_soft_placement=True)
+    config.gpu_options.allow_growth = True
+    sess = tf.Session(config=config)
 
     init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
@@ -315,7 +317,9 @@ def run_eval():
 
       seen_step = int(global_step)
       print(seen_step)
-      sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+      config = tf.ConfigProto(allow_soft_placement=True)
+      config.gpu_options.allow_growth = True
+      sess = tf.Session(config=config)
       saver.restore(sess, ckpt.model_checkpoint_path)
       coord = tf.train.Coordinator()
       threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -373,6 +377,7 @@ def eval_ensemble(ckpnts):
     result = model([features])
     logits = result['logits']
     config = tf.ConfigProto(allow_soft_placement=True)
+    config.gpu_options.allow_growth = True
     # saver.restore(sess, tf.train.latest_checkpoint(FLAGS.ckpnt))
     batch_logits = np.zeros((FLAGS.eval_size // 100, 100, 10), dtype=np.float32)
     batch_recons_label = np.zeros((FLAGS.eval_size // 100, 100),
@@ -448,6 +453,7 @@ def eval_once(ckpnt):
     saver = tf.train.Saver()
     test_writer = tf.summary.FileWriter(FLAGS.summary_dir + '/test_once')
     config = tf.ConfigProto(allow_soft_placement=True)
+    config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = 0.3
     sess = tf.Session(config=config)
     # saver.restore(sess, tf.train.latest_checkpoint(FLAGS.ckpnt))

@@ -20,10 +20,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import tensorflow.compat.v1 as tf
-from capsule_em import em_model
-from capsule_em import layers
-from capsule_em import simple_model
-from capsule_em import utils
+import em_model
+import layers
+import simple_model
+import utils
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -90,74 +90,74 @@ def multi_gpu_model(features):
       print('not supported')
   else:
     inference = simple_model.conv_inference
-  with tf.device('/cpu:0'):
-    global_step = tf.get_variable(
-        'global_step', [],
-        initializer=tf.constant_initializer(0),
-        trainable=False)
+  # with tf.device('/cpu:0'):
+  global_step = tf.get_variable(
+      'global_step', [],
+      initializer=tf.constant_initializer(0),
+      trainable=False)
 
-    lr = tf.train.exponential_decay(
-        FLAGS.learning_rate,
-        global_step,
-        FLAGS.decay_steps,
-        FLAGS.decay_rate,
-        staircase=FLAGS.staircase)
-    if FLAGS.clip_lr:
-      lr = tf.maximum(lr, 1e-6)
+  lr = tf.train.exponential_decay(
+      FLAGS.learning_rate,
+      global_step,
+      FLAGS.decay_steps,
+      FLAGS.decay_rate,
+      staircase=FLAGS.staircase)
+  if FLAGS.clip_lr:
+    lr = tf.maximum(lr, 1e-6)
 
-    if FLAGS.adam:
-      opt = tf.train.AdamOptimizer(lr)
-    else:
-      opt = tf.train.GradientDescentOptimizer(lr)
+  if FLAGS.adam:
+    opt = tf.train.AdamOptimizer(lr)
+  else:
+    opt = tf.train.GradientDescentOptimizer(lr)
 
-    tower_grads = []
-    corrects = []
-    almosts = []
-    result = {}
-    with tf.variable_scope(tf.get_variable_scope()):
-      for i in range(FLAGS.num_gpus):
-        with tf.device('/gpu:%d' % i):
-          with tf.name_scope('tower_%d' % (i)) as scope:
-            label_ = features[i]['labels']
-            y, result['recons_1'], result['recons_2'], result[
-                'mid_act'] = inference(features[i])
-            result['logits'] = y
+  tower_grads = []
+  corrects = []
+  almosts = []
+  result = {}
+  with tf.variable_scope(tf.get_variable_scope()):
+    for i in range(FLAGS.num_gpus):
+      # with tf.device('/gpu:%d' % i):
+        with tf.name_scope('tower_%d' % (i)) as scope:
+          label_ = features[i]['labels']
+          y, result['recons_1'], result['recons_2'], result[
+              'mid_act'] = inference(features[i])
+          result['logits'] = y
 
-            losses, correct, almost = layers.optimizer(
-                logits=y,
-                labels=label_,
-                multi=FLAGS.multi and FLAGS.data_set == 'mnist',
-                scope=scope,
-                softmax=FLAGS.softmax,
-                rate=FLAGS.loss_rate,
-                step=global_step,
-            )
-            tf.get_variable_scope().reuse_variables()
-            corrects.append(correct)
-            almosts.append(almost)
-            #           summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
-            grads = opt.compute_gradients(
-                losses,
-                gate_gradients=tf.train.Optimizer.GATE_NONE,
-            )
-            tower_grads.append(grads)
+          losses, correct, almost = layers.optimizer(
+              logits=y,
+              labels=label_,
+              multi=FLAGS.multi and FLAGS.data_set == 'mnist',
+              scope=scope,
+              softmax=FLAGS.softmax,
+              rate=FLAGS.loss_rate,
+              step=global_step,
+          )
+          tf.get_variable_scope().reuse_variables()
+          corrects.append(correct)
+          almosts.append(almost)
+          #           summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+          grads = opt.compute_gradients(
+              losses,
+              gate_gradients=tf.train.Optimizer.GATE_NONE,
+          )
+          tower_grads.append(grads)
 
-    with utils.maybe_jit_scope(), tf.name_scope('average_gradients'):
-      grads = _average_gradients(tower_grads)
-    summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
-    if FLAGS.verbose:
-      for grad, var in grads:
-        if grad is not None:
-          summaries.append(
-              tf.summary.histogram(var.op.name + '/gradients', grad))
-    summaries.append(tf.summary.scalar('learning_rate', lr))
-    result['summary'] = tf.summary.merge(summaries)
-    result['train'] = opt.apply_gradients(grads, global_step=global_step)
-    # result['train'] = y
+  with utils.maybe_jit_scope(), tf.name_scope('average_gradients'):
+    grads = _average_gradients(tower_grads)
+  summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
+  if FLAGS.verbose:
+    for grad, var in grads:
+      if grad is not None:
+        summaries.append(
+            tf.summary.histogram(var.op.name + '/gradients', grad))
+  summaries.append(tf.summary.scalar('learning_rate', lr))
+  result['summary'] = tf.summary.merge(summaries)
+  result['train'] = opt.apply_gradients(grads, global_step=global_step)
+  # result['train'] = y
 
-    cors = tf.stack(corrects)
-    alms = tf.stack(almosts)
-    result['correct'] = tf.reduce_sum(cors, 0)
-    result['almost'] = tf.reduce_sum(alms, 0)
+  cors = tf.stack(corrects)
+  alms = tf.stack(almosts)
+  result['correct'] = tf.reduce_sum(cors, 0)
+  result['almost'] = tf.reduce_sum(alms, 0)
 
-    return result
+  return result

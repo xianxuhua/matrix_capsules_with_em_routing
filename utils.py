@@ -71,8 +71,8 @@ else:
 
 def weight_variable(shape, stddev=0.1, wd=.0000002):
   """Create a weight variable with appropriate initialization."""
-  with tf.device('/cpu:0'):
-    with tf.name_scope('weights'):
+  # with tf.device('/cpu:0'):
+  with tf.name_scope('weights'):
       weights = tf.get_variable(
           'weights',
           shape,
@@ -88,8 +88,8 @@ def weight_variable(shape, stddev=0.1, wd=.0000002):
 
 def bias_variable(shape, init_value=0.1, name='biases'):
   """Create a bias variable with appropriate initialization."""
-  with tf.device('/cpu:0'):
-    with tf.name_scope(name):
+  # with tf.device('/cpu:0'):
+  with tf.name_scope(name):
       biases = tf.get_variable(
           name,
           shape,
